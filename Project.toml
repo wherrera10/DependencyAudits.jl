@@ -1,0 +1,11 @@
+name = "DependencyAudits"
+uuid = "4f8e0e77-6f95-4fcb-9548-1e391cbc7c20"
+authors = ["William Herrera <wherrera@alahonua.com>"]
+version = "0.1.0"
+
+[deps]
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+
+[compat]
+Julia = "1.10"
+TOML = "1"
