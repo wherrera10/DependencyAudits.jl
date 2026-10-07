@@ -1,4 +1,4 @@
-using Test, TOML, DependencyAudits
+using Test, TOML, RegistryInstances, DependencyAudits
 
 @testset "DependencyAudits" begin
 
@@ -49,7 +49,7 @@ using Test, TOML, DependencyAudits
             @test sort(replace.(uses[:MissingPkg], "\\" => "/"))    == ["src/TestPkg.jl"]
 
             # ---- audit_project ----
-            audit = audit_project(dir)
+            audit = auditdependencies(dir)
 
             @test audit.projectpath == joinpath(dir, "Project.toml")
             @test :JSON      ∈ audit.declared
@@ -60,12 +60,12 @@ using Test, TOML, DependencyAudits
             @test :MissingPkg ∈ audit.used
 
             @test :UnusedDep ∈ audit.unused
-            @test :MissingPkg ∈ audit.missing
+            @test :MissingPkg ∈ audit.undefined
             @test :LinearAlgebra ∈ audit.stdlibs
             @test :Dates         ∈ audit.stdlibs
 
             # nothing should be both unused and missing
-            @test isempty(intersect(audit.unused, audit.missing))
+            @test isempty(intersect(audit.unused, audit.undefined))
         end
     end
 
@@ -105,11 +105,11 @@ using Test, TOML, DependencyAudits
                 uuid = "00000000-0000-0000-0000-000000000003"
                 [deps]
             """)
-            audit = audit_project(dir)
+            audit = auditdependencies(dir)
             @test isempty(audit.declared)
             @test isempty(audit.used)
             @test isempty(audit.unused)
-            @test isempty(audit.missing)
+            @test isempty(audit.undefined)
             @test isempty(audit.stdlibs)
         end
     end
@@ -189,15 +189,15 @@ using Test, TOML, DependencyAudits
             end
             write(joinpath(dir, "src.jl"), "using CoreDep")
 
-            audit = audit_project(dir)
+            audit = auditdependencies(dir)
             @test :CoreDep  ∈ audit.declared
             @test :ExtraDep ∉ audit.declared
             @test :WeakDep  ∉ audit.declared
 
-            audit_ex = audit_project(dir; include_extras=true)
+            audit_ex = auditdependencies(dir; include_extras=true)
             @test :ExtraDep ∈ audit_ex.declared
 
-            audit_w = audit_project(dir; include_weakdeps=true)
+            audit_w = auditdependencies(dir; include_weakdeps=true)
             @test :WeakDep ∈ audit_w.declared
         end
     end
@@ -211,14 +211,39 @@ using Test, TOML, DependencyAudits
                 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
             """)
             write(joinpath(dir, "a.jl"), "using JSON\nusing MissingOne")
-            audit = audit_project(dir)
+            audit = auditdependencies(dir)
             # capture output just to make sure it runs
             buf = IOBuffer()
-            report(audit; io=buf)
+            auditreport(audit; io=buf)
             out = String(take!(buf))
             @test occursin("MissingOne", out)
             @test occursin("JSON", out)
         end
     end
 
+    @testset "uuidof registry lookups" begin
+        if isnothing(DependencyAudits.REGISTRY)
+            @test uuidof("RegistryInstances") === nothing
+        else
+            @test uuidof("RegistryInstances") == "2792f1a3-b283-48e8-9a74-f99dce5104f3"
+            @test uuidof(RegistryInstances) == "2792f1a3-b283-48e8-9a74-f99dce5104f3"
+            @test uuidof("NonExistentPackage") === nothing
+        end
+    end
+
+    @testset "version functions" begin
+        @test versionof(RegistryInstances) == v"0.1.0"
+        @test length(registeredversions("Accessors")) > 40
+        @test v"0.1.40" < versionof("Accessors") < v"0.3"
+        @test registeredversions("RegistryInstances") !== nothing
+    end
+
+    @testset "packagestrings function" begin
+        ps = packagestrings("RegistryInstances")
+        @test ps.name == "RegistryInstances"
+        @test ps.uuid == uuidof("RegistryInstances")
+        @test ps.version == latestversion("RegistryInstances")
+    end
 end
+
+true
