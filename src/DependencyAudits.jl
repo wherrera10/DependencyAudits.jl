@@ -44,7 +44,7 @@ const STDLIBS = Set([
 ])
 
 """
-find_dependencies(dir_path::String=".")
+    find_dependencies(dir_path::String=".")
 
 Recursively scan `dir_path` for Julia source files and return a sorted
 vector of module names (as Symbol) used by `using` and `import` statements.
@@ -166,7 +166,7 @@ function audit_project(dir_path::String = "."; project_path::Union{Nothing, Stri
 end
 
 """
-extract_modules_from_file!(file_path, modules)
+    extract_modules_from_file!(file_path, modules)
 
 Parse a Julia source file with JuliaSyntax and add modules found in
 `using` and `import` statements to `modules`.
@@ -191,7 +191,7 @@ function extract_modules_from_file!(file_path::String, modules::Set{Symbol})
 end
 
 """
-traverse_ast!(node, modules)
+    traverse_ast!(node, modules)
 
 Recursively inspect a JuliaSyntax tree for `using` and `import`
 statements.
@@ -199,22 +199,23 @@ statements.
 function traverse_ast!(node, modules::Set{Symbol})
     if node isa JuliaSyntax.GreenNode
         head = JuliaSyntax.kind(node)
-
         if head === K"using" || head === K"import"
+            
             for child in JuliaSyntax.children(node)
                 extract_module_name(child, modules)
             end
+            
             return
         end
 
         for child in JuliaSyntax.children(node)
             traverse_ast!(child, modules)
         end
+        
+    else
+        return nothing
     end
-
 end
-
-traverse_ast!(::Any, ::Set{Symbol}) = nothing
 
 """
 extract_module_name(node, modules)
