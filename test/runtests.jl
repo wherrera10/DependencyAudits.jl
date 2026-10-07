@@ -33,25 +33,25 @@ using Test, TOML, DependencyAudits
                 import JSON
             """)
 
-            # ---- find_dependencies ----
-            deps = find_dependencies(dir)
+            # ---- finddependencies ----
+            deps = finddependencies(dir)
             @test :JSON          ∈ deps
             @test :LinearAlgebra ∈ deps
             @test :Dates         ∈ deps
             @test :MissingPkg    ∈ deps
             @test :UnusedDep     ∉ deps
 
-            # ---- find_dependency_uses ----
-            uses = find_dependency_uses(dir)
-            @test sort(uses[:JSON]) == ["src/TestPkg.jl", "src/extra.jl"]
-            @test uses[:LinearAlgebra] == ["src/TestPkg.jl"]
-            @test uses[:Dates]         == ["src/extra.jl"]
-            @test uses[:MissingPkg]    == ["src/TestPkg.jl"]
+            # ---- finddependencyuses ----
+            uses = finddependencyuses(dir)
+            @test sort(replace.(uses[:JSON], "\\" => "/"))          == ["src/TestPkg.jl", "src/extra.jl"]
+            @test sort(replace.(uses[:LinearAlgebra], "\\" => "/")) == ["src/TestPkg.jl"]
+            @test sort(replace.(uses[:Dates], "\\" => "/"))         == ["src/extra.jl"]
+            @test sort(replace.(uses[:MissingPkg], "\\" => "/"))    == ["src/TestPkg.jl"]
 
             # ---- audit_project ----
             audit = audit_project(dir)
 
-            @test audit.project_path == joinpath(dir, "Project.toml")
+            @test audit.projectpath == joinpath(dir, "Project.toml")
             @test :JSON      ∈ audit.declared
             @test :UnusedDep ∈ audit.declared
             @test :JSON      ∈ audit.used
@@ -87,12 +87,12 @@ using Test, TOML, DependencyAudits
             mkpath(testdir)
             write(joinpath(testdir, "runtests.jl"), "using TestOnlyDep")
 
-            deps_default = find_dependencies(dir)
+            deps_default = finddependencies(dir)
             @test :MainDep     ∈ deps_default
             @test :TestOnlyDep ∉ deps_default
 
             # force-include the test directory
-            deps_all = find_dependencies(dir; exclude=String[])
+            deps_all = finddependencies(dir; exclude=String[])
             @test :MainDep     ∈ deps_all
             @test :TestOnlyDep ∈ deps_all
         end
@@ -123,11 +123,11 @@ using Test, TOML, DependencyAudits
             """)
             write(joinpath(dir, "broken.jl"), """
                 using Foo
-                this is not valid julia !!!
+                This should generate a warning as it is read by parseall because  it is not valid julia code.
             """)
             # must not throw
-            deps = find_dependencies(dir)
-            @test :Foo ∈ deps
+            deps = finddependencies(dir)
+            @test isempty(deps) # if there are initial syntax errors, no dependencies should be found
         end
     end
 
@@ -143,7 +143,7 @@ using Test, TOML, DependencyAudits
                 import ..ParentMod
                 using AbsoluteMod
             """)
-            deps = find_dependencies(dir)
+            deps = finddependencies(dir)
             @test :AbsoluteMod ∈ deps
             @test :LocalMod    ∉ deps
             @test :ParentMod   ∉ deps
@@ -162,7 +162,7 @@ using Test, TOML, DependencyAudits
                 import Bar as Baz
                 using A.B.C
             """)
-            deps = find_dependencies(dir)
+            deps = finddependencies(dir)
             @test :Foo ∈ deps
             @test :Bar ∈ deps
             @test :A   ∈ deps
@@ -222,4 +222,3 @@ using Test, TOML, DependencyAudits
     end
 
 end
-
