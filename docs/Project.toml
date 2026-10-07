@@ -1,11 +1,5 @@
-using Documenter, DependencyAudits
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 
-makedocs(
-    sitename = "DependencyAudits Module Documentation",
-    format = Documenter.HTML(prettyurls = false),
-)
-
-deploydocs(
-    repo = "github.com/wherrera10/DependencyAudits.jl.git",
-    devbranch = "main",  
-)
+[compat]
+Documenter = "1"
