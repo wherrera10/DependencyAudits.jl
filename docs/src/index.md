@@ -17,5 +17,5 @@ julia> auditreport(audit)
 
 ```@autodocs
 
-Modules = [OpenBCIDevices]
+Modules = [DependencyAudits]
 ```
