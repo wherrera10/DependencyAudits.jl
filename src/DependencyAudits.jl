@@ -1,54 +1,54 @@
+""" DependencyAudits: Audit Julia project dependencies """
+
 module DependencyAudits
 
 using JuliaSyntax
 using JuliaSyntax: parseall, kind, children, source, GreenNode, K
 using TOML
 
-export find_dependencies, find_dependency_uses, audit_project, report
-
-# ---------------------------------------------------------------------------
-# Standard libraries (dynamic)
-# ---------------------------------------------------------------------------
+export finddependencies, finddependencyuses, audit_project, report
 
 """
-    stdlib_names() -> Set{Symbol}
+    stdlibnames()::Set{Symbol}
 
 Return the set of standard-library module names available in the running
-Julia installation.  Built by scanning `Sys.STDLIB`.
+Julia installation. Built by scanning `Sys.STDLIB`. Run once at startup to 
+cache the list of standard libraries as a const.
 """
-function stdlib_names()::Set{Symbol}
+function stdlibnames()::Set{Symbol}
     names = Set{Symbol}()
     if isdir(Sys.STDLIB)
+
         for entry in readdir(Sys.STDLIB)
             if isdir(joinpath(Sys.STDLIB, entry))
                 push!(names, Symbol(entry))
             end
         end
+
     end
     return names
 end
 
-const STDLIBS = stdlib_names()
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+# Cached set of standard-library module names
+const STDLIBS = stdlibnames()
 
 """
-    find_dependencies(dir_path::AbstractString = ".";
-                      exclude = ["test", "docs", "benchmark", ".git"]) -> Vector{Symbol}
+    finddependencies(dirpath::AbstractString = ".";
+                      exclude = ["test", "docs", "benchmark", ".git"])::Vector{Symbol}
 
-Recursively scan `dir_path` for Julia source files (`.jl`) and return a
+Recursively scan `dirpath` for Julia source files (`.jl`) and return a
 sorted vector of the **top-level** module names that appear in `using` /
 `import` statements.
 
 Relative imports (those beginning with `.`) are ignored.
 Directories listed in `exclude` (matched by basename) are skipped.
 """
-function find_dependencies(dir_path::AbstractString = ".";
-                           exclude = ["test", "docs", "benchmark", ".git"])
+function finddependencies(
+    dirpath::AbstractString = ".";
+    exclude = ["test", "docs", "benchmark", ".git"],
+)
     dependencies = Set{Symbol}()
-    base = abspath(dir_path)
+    base = abspath(dirpath)
 
     for (root, dirs, files) in walkdir(base)
         # prune excluded directories in-place
@@ -56,8 +56,8 @@ function find_dependencies(dir_path::AbstractString = ".";
 
         for file in files
             endswith(file, ".jl") || continue
-            file_path = joinpath(root, file)
-            extract_modules_from_file!(file_path, dependencies)
+            filepath = joinpath(root, file)
+            extract_modules_from_file!(filepath, dependencies)
         end
     end
 
@@ -65,30 +65,33 @@ function find_dependencies(dir_path::AbstractString = ".";
 end
 
 """
-    find_dependency_uses(dir_path::AbstractString = ".";
+    finddependencyuses(dirpath::AbstractString = ".";
                          exclude = ["test", "docs", "benchmark", ".git"])
-        -> Dict{Symbol,Vector{String}}
+        ::Dict{Symbol,Vector{String}}
 
-Recursively scan `dir_path` for Julia source files and return a dictionary
+Recursively scan `dirpath` for Julia source files and return a dictionary
 mapping each imported top-level module to the list of files (relative to
-`dir_path`) in which it appears.
+`dirpath`) in which it appears.
 """
-function find_dependency_uses(dir_path::AbstractString = ".";
-                              exclude = ["test", "docs", "benchmark", ".git"])
-    uses = Dict{Symbol, Vector{String}}()
-    base = abspath(dir_path)
+function finddependencyuses(
+    dirpath::AbstractString = ".";
+    exclude = ["test", "docs", "benchmark", ".git"],
+)
+    uses = Dict{Symbol,Vector{String}}()
+    base = abspath(dirpath)
 
     for (root, dirs, files) in walkdir(base)
         filter!(d -> !(d in exclude), dirs)
 
         for file in files
             endswith(file, ".jl") || continue
-            file_path = joinpath(root, file)
+            filepath = joinpath(root, file)
             modules = Set{Symbol}()
-            extract_modules_from_file!(file_path, modules)
-            relative_path = relpath(file_path, base)
+            extract_modules_from_file!(filepath, modules)
+            relativepath = relpath(filepath, base)
+
             for mod in modules
-                push!(get!(uses, mod, String[]), relative_path)
+                push!(get!(uses, mod, String[]), relativepath)
             end
         end
     end
@@ -101,19 +104,19 @@ function find_dependency_uses(dir_path::AbstractString = ".";
 end
 
 """
-    audit_project(dir_path::AbstractString = ".";
-                  project_path = nothing,
+    audit_project(dirpath::AbstractString = ".";
+                  projectpath = nothing,
                   exclude = ["test", "docs", "benchmark", ".git"],
                   include_extras::Bool = false,
-                  include_weakdeps::Bool = false)
+                  include_weakdeps::Bool = false)::NamedTuple
 
 Compare the modules actually referenced by Julia source files with the
 dependencies declared in `Project.toml` (or `JuliaProject.toml`).
 
 # Arguments
-- `dir_path` – root of the project tree to scan.
-- `project_path` – explicit path to the project file; when `nothing` the
-  function looks for `Project.toml` or `JuliaProject.toml` under `dir_path`.
+- `dirpath` – root of the project tree to scan.
+- `projectpath` – explicit path to the project file; when `nothing` the
+  function looks for `Project.toml` or `JuliaProject.toml` under `dirpath`.
 - `exclude` – directory basenames that are skipped while walking the tree.
 - `include_extras` – also treat entries under `[extras]` as declared.
 - `include_weakdeps` – also treat entries under `[weakdeps]` as declared.
@@ -123,7 +126,7 @@ A named tuple with the fields
 
 | field          | meaning |
 |----------------|---------|
-| `project_path` | absolute path of the project file that was read |
+| `projectpath`  | absolute path of the project file that was read |
 | `declared`     | sorted vector of declared dependency names |
 | `used`         | sorted vector of modules found in source |
 | `unused`       | declared but never referenced |
@@ -131,29 +134,31 @@ A named tuple with the fields
 | `stdlibs`      | referenced standard-library modules |
 | `uses`         | `Dict{Symbol,Vector{String}}` of module → files |
 
-The function never modifies the project file.
+The function reads, but does not modify the Project.toml or JuliaProject.toml file.
 """
-function audit_project(dir_path::AbstractString = ".";
-                       project_path::Union{Nothing,AbstractString} = nothing,
-                       exclude = ["test", "docs", "benchmark", ".git"],
-                       include_extras::Bool = false,
-                       include_weakdeps::Bool = false)
-    base = abspath(dir_path)
+function audit_project(
+    dirpath::AbstractString = ".";
+    projectpath::Union{Nothing,AbstractString} = nothing,
+    exclude = ["test", "docs", "benchmark", ".git"],
+    include_extras::Bool = false,
+    include_weakdeps::Bool = false,
+)::NamedTuple
+    base = abspath(dirpath)
 
-    project = if project_path === nothing
-        candidates = (joinpath(base, "Project.toml"),
-                      joinpath(base, "JuliaProject.toml"))
+    project = if projectpath === nothing
+        candidates = (joinpath(base, "Project.toml"), joinpath(base, "JuliaProject.toml"))
         found = findfirst(isfile, candidates)
-        found === nothing && throw(ArgumentError(
-            "Neither Project.toml nor JuliaProject.toml found under $base"))
+        found === nothing && throw(
+            ArgumentError("Neither Project.toml nor JuliaProject.toml found under $base"),
+        )
         candidates[found]
     else
-        abspath(project_path)
+        abspath(projectpath)
     end
 
     isfile(project) || throw(ArgumentError("Project file not found: $project"))
 
-    project_data = try
+    projectdata = try
         TOML.parsefile(project)
     catch err
         throw(ArgumentError("Could not parse $project: $err"))
@@ -161,38 +166,41 @@ function audit_project(dir_path::AbstractString = ".";
 
     declared = Set{Symbol}()
     for section in ("deps",)
-        table = get(project_data, section, Dict{String,Any}())
+        table = get(projectdata, section, Dict{String,Any}())
+
         for name in keys(table)
             push!(declared, Symbol(name))
         end
     end
     if include_extras
-        table = get(project_data, "extras", Dict{String,Any}())
+        table = get(projectdata, "extras", Dict{String,Any}())
+
         for name in keys(table)
             push!(declared, Symbol(name))
         end
     end
     if include_weakdeps
-        table = get(project_data, "weakdeps", Dict{String,Any}())
+        table = get(projectdata, "weakdeps", Dict{String,Any}())
+
         for name in keys(table)
             push!(declared, Symbol(name))
         end
     end
 
-    uses = find_dependency_uses(base; exclude=exclude)
+    uses = finddependencyuses(base; exclude = exclude)
     used = Set{Symbol}(keys(uses))
     stdlibs_used = intersect(used, STDLIBS)
     unused = setdiff(declared, used)
     missing = setdiff(used, union(declared, STDLIBS))
 
     return (
-        project_path = project,
-        declared     = sort!(collect(declared)),
-        used         = sort!(collect(used)),
-        unused       = sort!(collect(unused)),
-        missing      = sort!(collect(missing)),
-        stdlibs      = sort!(collect(stdlibs_used)),
-        uses         = uses,
+        projectpath = project,
+        declared = sort!(collect(declared)),
+        used = sort!(collect(used)),
+        unused = sort!(collect(unused)),
+        missing = sort!(collect(missing)),
+        stdlibs = sort!(collect(stdlibs_used)),
+        uses = uses,
     )
 end
 
@@ -202,16 +210,22 @@ end
 Print a human-readable summary of the result returned by `audit_project`.
 """
 function report(audit; io::IO = stdout)
-    println(io, "Project file : ", audit.project_path)
+    println(io, "Project file : ", audit.projectpath)
     println(io)
     println(io, "Declared dependencies ($(length(audit.declared))):")
-    isempty(audit.declared) ? println(io, "  (none)") :
+    if isempty(audit.declared)
+        println(io, "  (none)")
+    else
         foreach(d -> println(io, "  ", d), audit.declared)
+    end
 
     println(io)
     println(io, "Used modules ($(length(audit.used))):")
-    isempty(audit.used) ? println(io, "  (none)") :
+    if isempty(audit.used)
+        println(io, "  (none)")
+    else
         foreach(u -> println(io, "  ", u), audit.used)
+    end
 
     println(io)
     if !isempty(audit.unused)
@@ -237,29 +251,24 @@ function report(audit; io::IO = stdout)
     return nothing
 end
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
 """
-    extract_modules_from_file!(file_path, modules::Set{Symbol})
+    extract_modules_from_file!(filepath, modules::Set{Symbol})
 
 Parse a Julia source file and add every top-level module name that appears
 in a `using` or `import` statement to `modules`.
 """
-function extract_modules_from_file!(file_path::AbstractString, modules::Set{Symbol})
+function extract_modules_from_file!(filepath::AbstractString, modules::Set{Symbol})
     code = try
-        read(file_path, String)
+        read(filepath, String)
     catch err
-        @warn "Could not read $file_path" exception=err
+        @warn "Could not read $filepath" exception = err
         return
     end
 
-    # Prefer the Expr AST – it is stable and easy to walk.
     expr = try
         parseall(Expr, code)
     catch err
-        @warn "Syntax error while parsing $file_path" exception=err
+        @warn "Syntax error while parsing $filepath" exception = err
         return
     end
 
@@ -268,6 +277,8 @@ function extract_modules_from_file!(file_path::AbstractString, modules::Set{Symb
 end
 
 """
+    extract_from_expr!(ex, modules::Set{Symbol})
+
 Walk an `Expr` produced by JuliaSyntax / Base and collect top-level module
 names from `using` / `import` statements.
 """
@@ -280,7 +291,7 @@ function extract_from_expr!(ex, modules::Set{Symbol})
         for arg in ex.args
             add_toplevel_module!(arg, modules)
         end
-        return          # do not descend further into the import statement
+        return # quit recursive descent
     end
 
     # Recurse into all other expression forms (including :toplevel, :module, :block …)
@@ -291,6 +302,8 @@ function extract_from_expr!(ex, modules::Set{Symbol})
 end
 
 """
+    add_toplevel_module!(arg, modules::Set{Symbol})
+
 Extract the single top-level module name from one argument of a `using` /
 `import` expression.  Relative imports (leading dots) are ignored.
 """
@@ -336,6 +349,5 @@ function add_toplevel_module!(arg, modules::Set{Symbol})
     end
     return nothing
 end
-
 
 end # module DependencyAudits
