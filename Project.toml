@@ -11,3 +11,10 @@ RegistryInstances = "2792f1a3-b283-48e8-9a74-f99dce5104f3"
 [compat]
 julia = "1.10"
 RegistryInstances = "0.1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
+[targets]
+test = ["Test"]
