@@ -2,11 +2,11 @@
 
 module DependencyAudits
 
-using JuliaSyntax
-using JuliaSyntax: parseall, kind, children, source, GreenNode, K
-using TOML
+using JuliaSyntax, TOML
+using RegistryInstances
 
-export finddependencies, finddependencyuses, audit_project, report
+export uuidof, registeredversions, latestversion, versionof, packagestrings
+export finddependencies, finddependencyuses, auditdependencies, auditreport
 
 """
     stdlibnames()::Set{Symbol}
@@ -32,6 +32,78 @@ end
 # Cached set of standard-library module names
 const STDLIBS = stdlibnames()
 
+const REGISTRY = try first(reachable_registries()); catch; nothing end
+const PACKAGE_ENTRIES = Dict{String,String}()
+
+if !isnothing(REGISTRY)
+    for (uuid, names) in REGISTRY
+        PACKAGE_ENTRIES[names.name] = string(names.uuid)
+    end
+end
+
+"""
+    uuidof(s::AbstractString)
+    uuidof(s)
+
+Return the UUID of the package with the given name `s` as a string. Returns a string
+of the uuid if the package is found in the global registry. Note that standard library 
+modules such as `Pkg` are not in such global registries, and so will not be found. 
+Returns nothing if the registry is not available or the package is not found. 
+Other types that can be converted to a string will also work.
+"""
+uuidof(s::AbstractString) = get(PACKAGE_ENTRIES, s, nothing)
+uuidof(s) = uuidof(string(s))
+
+"""
+    registeredversions(name; includeremoved=false) -> Vector{VersionNumber}
+
+All versions of package `name` found in the REGISTRY.
+"""
+function registeredversions(name::AbstractString; includeremoved::Bool=false)
+    versions = VersionNumber[]
+    for (_, entry) in REGISTRY.pkgs
+        if entry.name == name
+            info = registry_info(entry)
+            for (v, vinfo) in info.version_info
+                (includeremoved || !vinfo.yanked) && push!(versions, v)
+            end
+        end
+    end
+    return sort!(unique!(versions))
+end
+
+"""
+    latestversion(name; includeremoved=false) -> Union{VersionNumber, Nothing}
+
+Return the latest version of package `name` found in the REGISTRY, or `nothing` if no 
+versions are found. `includeremoved` controls whether removed versions are considered.
+Will look up 
+"""
+function latestversion(name::AbstractString; includeremoved::Bool=false)
+    vs = registeredversions(name; includeremoved=includeremoved)
+    return isempty(vs) ? nothing : last(vs)
+end
+latestversion(s) = latestversion(string(s))
+
+"""
+    versionof(name) -> Union{VersionNumber, Nothing}
+
+Argument `name` should be String or an objectconvertible to a string.
+Return the latest version of package `name` found in the REGISTRY, or `nothing` if no 
+versions are found. Alias for `latestversion`.
+"""
+versionof(name) = latestversion(name)
+
+"""
+    packagestrings(pkgname::AbstractString)
+
+Return a named tuple containing name, UUID, and latest version of the 
+package `pkgname` found in the global registry, without downloading it.
+"""
+function packagestrings(pkgname::AbstractString)
+    return (name=pkgname, uuid=uuidof(pkgname), version=latestversion(pkgname))
+end
+
 """
     finddependencies(dirpath::AbstractString = ".";
                       exclude = ["test", "docs", "benchmark", ".git"])::Vector{Symbol}
@@ -44,8 +116,8 @@ Relative imports (those beginning with `.`) are ignored.
 Directories listed in `exclude` (matched by basename) are skipped.
 """
 function finddependencies(
-    dirpath::AbstractString = ".";
-    exclude = ["test", "docs", "benchmark", ".git"],
+    dirpath::AbstractString=".";
+    exclude=["test", "docs", "benchmark", ".git"],
 )
     dependencies = Set{Symbol}()
     base = abspath(dirpath)
@@ -74,8 +146,8 @@ mapping each imported top-level module to the list of files (relative to
 `dirpath`) in which it appears.
 """
 function finddependencyuses(
-    dirpath::AbstractString = ".";
-    exclude = ["test", "docs", "benchmark", ".git"],
+    dirpath::AbstractString=".";
+    exclude=["test", "docs", "benchmark", ".git"],
 )
     uses = Dict{Symbol,Vector{String}}()
     base = abspath(dirpath)
@@ -104,7 +176,7 @@ function finddependencyuses(
 end
 
 """
-    audit_project(dirpath::AbstractString = ".";
+    auditdependencies(dirpath::AbstractString = ".";
                   projectpath = nothing,
                   exclude = ["test", "docs", "benchmark", ".git"],
                   include_extras::Bool = false,
@@ -124,24 +196,26 @@ dependencies declared in `Project.toml` (or `JuliaProject.toml`).
 # Returns
 A named tuple with the fields
 
-| field          | meaning |
-|----------------|---------|
+| field          | meaning                                         |
+|----------------|-------------------------------------------------|
 | `projectpath`  | absolute path of the project file that was read |
-| `declared`     | sorted vector of declared dependency names |
-| `used`         | sorted vector of modules found in source |
-| `unused`       | declared but never referenced |
-| `missing`      | referenced, neither declared nor a stdlib |
-| `stdlibs`      | referenced standard-library modules |
+| `declared`     | sorted vector of declared dependency names      |
+| `used`         | sorted vector of modules found in source        |
+| `unused`       | declared but never referenced                   |
+| `undefined`    | referenced, neither declared nor a stdlib       |
+| `stdlibs`      | referenced standard-library modules             |
 | `uses`         | `Dict{Symbol,Vector{String}}` of module → files |
+| `tomltext`     | text made from the dependencies vector for use  |
+|                | if needed for adding to a `Project.toml` file   |
 
-The function reads, but does not modify the Project.toml or JuliaProject.toml file.
+The function reads, but does not modify the Project.toml file.
 """
-function audit_project(
-    dirpath::AbstractString = ".";
-    projectpath::Union{Nothing,AbstractString} = nothing,
-    exclude = ["test", "docs", "benchmark", ".git"],
-    include_extras::Bool = false,
-    include_weakdeps::Bool = false,
+function auditdependencies(
+    dirpath::AbstractString=".";
+    projectpath::Union{Nothing,AbstractString}=nothing,
+    exclude=["test", "docs", "benchmark", ".git"],
+    include_extras::Bool=false,
+    include_weakdeps::Bool=false,
 )::NamedTuple
     base = abspath(dirpath)
 
@@ -187,29 +261,37 @@ function audit_project(
         end
     end
 
-    uses = finddependencyuses(base; exclude = exclude)
+    uses = finddependencyuses(base; exclude=exclude)
     used = Set{Symbol}(keys(uses))
     stdlibs_used = intersect(used, STDLIBS)
     unused = setdiff(declared, used)
-    missing = setdiff(used, union(declared, STDLIBS))
+    missingones = setdiff(used, union(declared, STDLIBS))
 
+    tups = packagestrings.(string.(unique!(vcat(collect(used), collect(stdlibs_used)))))
+    tomltxt = isempty(tups) || !any(!isnothing, getfield.(tups, :uuid)) ? "" : begin
+        deps = join([t.name * " = " * t.uuid for t in tups if !isnothing(t.uuid)], "\n")
+        compat = join([t.name * " = " * string(t.version) for t in tups if !isnothing(t.version)], "\n")
+        "[deps]\n" * deps * "\n[compat]\n" * compat * "\n"
+    end
+    
     return (
         projectpath = project,
         declared = sort!(collect(declared)),
         used = sort!(collect(used)),
         unused = sort!(collect(unused)),
-        missing = sort!(collect(missing)),
+        undefined = sort!(collect(missingones)),
         stdlibs = sort!(collect(stdlibs_used)),
         uses = uses,
+        tomltext = tomltxt,
     )
 end
 
 """
-    report(audit; io::IO = stdout)
+    auditreport(audit; io::IO = stdout)
 
-Print a human-readable summary of the result returned by `audit_project`.
+Print a human-readable summary of the result returned by `auditdependencies`.
 """
-function report(audit; io::IO = stdout)
+function auditreport(audit; io::IO=stdout)
     println(io, "Project file : ", audit.projectpath)
     println(io)
     println(io, "Declared dependencies ($(length(audit.declared))):")
@@ -236,9 +318,9 @@ function report(audit; io::IO = stdout)
     end
 
     println(io)
-    if !isempty(audit.missing)
+    if !isempty(audit.undefined)
         println(io, "⚠  Missing from Project.toml (not stdlib):")
-        foreach(m -> println(io, "  ", m), audit.missing)
+        foreach(m -> println(io, "  ", m), audit.undefined)
     else
         println(io, "✓  No missing dependencies")
     end
