@@ -6,10 +6,15 @@ on:
   push:
     branches:
       - main
-    tags: 
+    tags:
       - '**'
+
+permissions:
+  contents: write
+
 env:
   JULIA_NUM_THREADS: 2
+
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
@@ -45,6 +50,7 @@ jobs:
       - uses: codecov/codecov-action@v4
         with:
           file: lcov.info
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest
@@ -62,7 +68,7 @@ jobs:
           julia --project=docs -e '
             using Documenter: doctest
             using DependencyAudits
-            doctest(DependencyAudits)' 
+            doctest(DependencyAudits)'
       - run: julia --project=docs docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
