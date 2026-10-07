@@ -1,6 +1,6 @@
 module DependencyAudits
 
-using TOML
+using JuliaSyntax, TOML # JuliaSyntax is in Julia 1.10+
 
 export find_dependencies, find_dependency_uses, audit_project
 
@@ -166,10 +166,10 @@ function audit_project(dir_path::String = "."; project_path::Union{Nothing, Stri
 end
 
 """
-    extract_modules_from_file!(file_path, modules)
+extract_modules_from_file!(file_path, modules)
 
-Parse one Julia source file and add modules found in `using` and `import`
-statements to `modules`.
+Parse a Julia source file with JuliaSyntax and add modules found in
+`using` and `import` statements to `modules`.
 """
 function extract_modules_from_file!(file_path::String, modules::Set{Symbol})
     code = try
@@ -179,79 +179,66 @@ function extract_modules_from_file!(file_path::String, modules::Set{Symbol})
         return
     end
 
-    ast = try
-        Meta.parseall(code)
+    tree = try
+        JuliaSyntax.parseall(code)
     catch err
         @warn "Syntax error parsing $file_path: $err"
         return
     end
 
-    traverse_ast!(ast, modules)
+    traverse_ast!(tree, modules)
+
 end
 
 """
-    traverse_ast!(expr, modules)
+traverse_ast!(node, modules)
 
-Recursively inspect a Julia expression for `using` and `import`
+Recursively inspect a JuliaSyntax tree for `using` and `import`
 statements.
 """
-function traverse_ast!(expr::Expr, modules::Set{Symbol})
-    if expr.head === :using || expr.head === :import
-        for arg in expr.args
-            mod_name = extract_module_name(arg)
-            if mod_name !== nothing
-                push!(modules, mod_name)
-            end
-        end
-        return
-    end
+function traverse_ast!(node, modules::Set{Symbol})
+    if node isa JuliaSyntax.GreenNode
+        head = JuliaSyntax.kind(node)
 
-    for arg in expr.args
-        if arg isa Expr
-            traverse_ast!(arg, modules)
+        if head === K"using" || head === K"import"
+            for child in JuliaSyntax.children(node)
+                extract_module_name(child, modules)
+            end
+            return
+        end
+
+        for child in JuliaSyntax.children(node)
+            traverse_ast!(child, modules)
         end
     end
 
 end
 
-""" null AST if no chance of import or using because no expression involved """
 traverse_ast!(::Any, ::Set{Symbol}) = nothing
 
 """
-    extract_module_name(arg)
+extract_module_name(node, modules)
 
-Extract the top-level module name from an AST node representing a
-`using` or `import` argument.
+Extract module names from a JuliaSyntax node representing a `using`
+or `import` statement.
 """
-function extract_module_name(arg)
-    if arg isa Symbol
-        # Ignore relative imports such as `import .Foo`.
-        return arg === :(.) ? nothing : arg
+function extract_module_name(node, modules::Set{Symbol})
+    if !(node isa JuliaSyntax.GreenNode)
+        return
     end
 
-    if !(arg isa Expr)
-        return nothing
+    kind = JuliaSyntax.kind(node)
+
+    if kind === K"Identifier"
+        name = String(JuliaSyntax.source(node))
+        push!(modules, Symbol(name))
+        return
     end
 
-    if arg.head === :.
-        # Foo.Bar
-        if !isempty(arg.args) && arg.args[1] isa Symbol
-            return arg.args[1]
-        end
-    elseif arg.head === :as
-        # Foo as F
-        return extract_module_name(arg.args[1])
-    elseif arg.head === :(::)
-        return extract_module_name(arg.args[1])
-    elseif arg.head === :colon
-        # Foo: bar, baz
-        return isempty(arg.args) ? nothing : extract_module_name(arg.args[1])
-    elseif arg.head === Symbol(":")
-        # Compatibility with alternate parser representations.
-        return isempty(arg.args) ? nothing : extract_module_name(arg.args[1])
+    for child in JuliaSyntax.children(node)
+        extract_module_name(child, modules)
     end
 
-    return nothing
 end
 
 
