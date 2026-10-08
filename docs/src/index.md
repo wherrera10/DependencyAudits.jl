@@ -4,7 +4,7 @@
 
 
 Audit source code dependencies for the correctness of the files listed in Project.toml.
-Useful to assist in creating a Project.toml for an existing code, since ``reportaudit`` will
+Useful to assist in creating a Project.toml for an existing code base. Running ``reportaudit(audit)`` will
 suggest lines to be placed in Project.toml and report packages used but not included in your .toml file.
 
 
