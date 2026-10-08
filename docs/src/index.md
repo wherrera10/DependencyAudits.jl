@@ -40,12 +40,10 @@ Example:
       Test
       Unitful
     
-    Used modules (21):
-      .
+    Used modules (19):
       Accessors
       Aqua
       AxisKeys
-      Base
       BenchmarkTools
       ConstructionBase
       Dates
@@ -66,7 +64,6 @@ Example:
     ✓  No unused declared dependencies
     
     ⚠  Missing from Project.toml (not stdlib):
-      .
       Accessors
     
     Standard libraries used:
