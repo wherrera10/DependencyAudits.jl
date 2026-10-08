@@ -12,13 +12,101 @@ Project.toml, with appropriate UUIDs, and also reports any packages used but not
 
 Example:
 
-julia> using DependencyAudits
 
-julia> cd("my code directory")
+    julia> using DependencyAudits
+    
+    julia> cd(".julia/dev/Accessors/test")
+    
+    julia> auditreport(auditdependencies())
+    Project file : /home/.julia/dev/Accessors/test/Project.toml
+    
+    Declared dependencies (18):
+      Aqua
+      AxisKeys
+      BenchmarkTools
+      ConstructionBase
+      Dates
+      InteractiveUtils
+      IntervalSets
+      InverseFunctions
+      LinearAlgebra
+      MacroTools
+      PerformanceTestTools
+      QuickTypes
+      REPL
+      StaticArrays
+      StaticNumbers
+      StructArrays
+      Test
+      Unitful
+    
+    Used modules (19):
+      Accessors
+      Aqua
+      AxisKeys
+      BenchmarkTools
+      ConstructionBase
+      Dates
+      InteractiveUtils
+      IntervalSets
+      InverseFunctions
+      LinearAlgebra
+      MacroTools
+      PerformanceTestTools
+      QuickTypes
+      REPL
+      StaticArrays
+      StaticNumbers
+      StructArrays
+      Test
+      Unitful
+    
+    ✓  No unused declared dependencies
+    
+    ⚠  Missing from Project.toml (not stdlib):
+      Accessors
+    
+    Standard libraries used:
+      Dates
+      InteractiveUtils
+      LinearAlgebra
+      REPL
+      Test
+    
+    Partial suggested possible TOML snippet for dependencies and compatibility:
+    [deps]
+    InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
+    MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+    Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+    PerformanceTestTools = "dc46b164-d16f-48ec-a853-60448fc869fe"
+    BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+    Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
+    IntervalSets = "8197267c-284f-5f27-9208-e0e47529a953"
+    StaticNumbers = "c5e4b96a-f99f-5557-8ed2-dc63ef9b5131"
+    ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+    QuickTypes = "ae2dfa86-617c-530c-b392-ef20fdad97bb"
+    StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+    AxisKeys = "94b1ba4f-4ee9-5380-92f1-94cde586c3c5"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+    
+    [compat]
+    julia = "1.10"
+    InverseFunctions = "0.1"
+    MacroTools = "0.5"
+    Aqua = "0.8"
+    StaticArrays = "1.9"
+    PerformanceTestTools = "0.1"
+    BenchmarkTools = "1.8"
+    Accessors = "0.1"
+    IntervalSets = "0.7"
+    StaticNumbers = "0.4"
+    ConstructionBase = "1.6"
+    QuickTypes = "1.9"
+    StructArrays = "0.7"
+    AxisKeys = "0.2"
+    Unitful = "1.29"
 
-julia> audit = auditdependencies()
-
-julia> auditreport(audit)
 
 ## Functions Reference
 
