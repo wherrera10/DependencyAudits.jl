@@ -2,7 +2,11 @@
 
 ![Description](assets/depaud.png)
 
-Audit a code tree for its dependencies and correlate with its Project.toml file
+
+Audit source code dependencies for the correctness of the files listed in Project.toml.
+Useful to assist in creating a Project.toml for an existing code, since ``reportaudit`` will
+suggest lines to be placed in Project.toml and report packages used but not included in your .toml file.
+
 
 Example:
 
