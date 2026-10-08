@@ -127,6 +127,7 @@ function finddependencies(
             extract_modules_from_file!(joinpath(root, file), dependencies)
         end
     end
+    delete!(dependencies, Symbol("Main")) # Remove the Main module if present
     return sort!(collect(dependencies))
 end
 
@@ -276,6 +277,7 @@ function auditdependencies(
     uses, parse_errors = _finddependencyuses(base; exclude=exclude)
     used = Set{Symbol}(keys(uses))
     stdlibs_used = intersect(used, STDLIBS)
+    delete!(stdlibs_used, :Base) # ignore references to Base
     unused = setdiff(declared, used)
     undeclared = setdiff(used, union(declared, STDLIBS))
 
