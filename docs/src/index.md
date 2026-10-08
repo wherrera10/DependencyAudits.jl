@@ -18,7 +18,7 @@ Example:
     julia> cd(".julia/dev/Accessors/test")
     
     julia> auditreport(auditdependencies())
-    Project file : /home/.julia/dev/Accessors/test/Project.toml
+    Project file : C:\Users\wherr\.julia\dev\Accessors\test\Project.toml
     
     Declared dependencies (18):
       Aqua
@@ -40,10 +40,12 @@ Example:
       Test
       Unitful
     
-    Used modules (19):
+    Used modules (21):
+      .
       Accessors
       Aqua
       AxisKeys
+      Base
       BenchmarkTools
       ConstructionBase
       Dates
@@ -64,6 +66,7 @@ Example:
     ✓  No unused declared dependencies
     
     ⚠  Missing from Project.toml (not stdlib):
+      .
       Accessors
     
     Standard libraries used:
@@ -73,7 +76,7 @@ Example:
       REPL
       Test
     
-    Partial suggested possible TOML snippet for dependencies and compatibility:
+    Suggested possible TOML snippet:
     [deps]
     InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
     MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
@@ -106,7 +109,6 @@ Example:
     StructArrays = "0.7"
     AxisKeys = "0.2"
     Unitful = "1.29"
-
 
 ## Functions Reference
 
