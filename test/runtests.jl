@@ -60,12 +60,12 @@ using Test, TOML, RegistryInstances, DependencyAudits
             @test :MissingPkg ∈ audit.used
 
             @test :UnusedDep ∈ audit.unused
-            @test :MissingPkg ∈ audit.undefined
+            @test :MissingPkg ∈ audit.undeclared
             @test :LinearAlgebra ∈ audit.stdlibs
             @test :Dates         ∈ audit.stdlibs
 
             # nothing should be both unused and missing
-            @test isempty(intersect(audit.unused, audit.undefined))
+            @test isempty(intersect(audit.unused, audit.undeclared))
         end
     end
 
@@ -109,7 +109,7 @@ using Test, TOML, RegistryInstances, DependencyAudits
             @test isempty(audit.declared)
             @test isempty(audit.used)
             @test isempty(audit.unused)
-            @test isempty(audit.undefined)
+            @test isempty(audit.undeclared)
             @test isempty(audit.stdlibs)
         end
     end
