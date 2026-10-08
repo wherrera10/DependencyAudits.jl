@@ -276,8 +276,10 @@ function auditdependencies(
 
     uses, parse_errors = _finddependencyuses(base; exclude=exclude)
     used = Set{Symbol}(keys(uses))
+    delete!(used, :Base) # ignore references to Base
+    delete!(used, :Main) # ignore references to Main
+    delete!(used, :.) # ignore references to the current module
     stdlibs_used = intersect(used, STDLIBS)
-    delete!(stdlibs_used, :Base) # ignore references to Base
     unused = setdiff(declared, used)
     undeclared = setdiff(used, union(declared, STDLIBS))
 
