@@ -208,7 +208,7 @@ A named tuple with the fields
 | `declared`     | sorted vector of declared dependency names      |
 | `used`         | sorted vector of modules found in source        |
 | `unused`       | declared but never referenced                   |
-| `undefined`    | referenced, neither declared nor a stdlib       |
+| `undeclared`   | referenced, neither declared nor a stdlib       |
 | `stdlibs`      | referenced standard-library modules             |
 | `uses`         | `Dict{Symbol,Vector{String}}` of module → files |
 | `tomltext`     | text made from the dependencies vector for use  |
@@ -326,7 +326,7 @@ function auditdependencies(
             declared = sort!(collect(declared)),
             used = sort!(collect(used)),
             unused = sort!(collect(unused)),
-            undefined = sort!(collect(missingones)),
+            undeclared = sort!(collect(missingones)),
             stdlibs = sort!(collect(stdlibs_used)),
             uses = uses,
             tomltext = tomltxt,
@@ -365,9 +365,9 @@ function auditreport(audit; io::IO = stdout)
         end
 
         println(io)
-        if !isempty(audit.undefined)
+        if !isempty(audit.undeclared)
             println(io, "⚠  Missing from Project.toml (not stdlib):")
-            foreach(m -> println(io, "  ", m), audit.undefined)
+            foreach(m -> println(io, "  ", m), audit.undeclared)
         else
             println(io, "✓  No missing dependencies")
         end
