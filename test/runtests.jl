@@ -244,6 +244,18 @@ using Test, TOML, RegistryInstances, DependencyAudits
         @test ps.uuid == uuidof("RegistryInstances")
         @test ps.version == latestversion("RegistryInstances")
     end
+
+    @testset "audit and report" begin
+        audit = auditdependencies(pwd())
+        @test sort!(audit.declared) == [:JuliaSyntax, :RegistryInstances, :TOML]
+        io = IOBuffer()
+        auditreport(audit; io=io)
+        out = String(take!(io))
+        @test occursin("JuliaSyntax", out)
+        @test occursin("RegistryInstances", out)
+        @test occursin("TOML", out)
+    end        
+
 end
 
 true
