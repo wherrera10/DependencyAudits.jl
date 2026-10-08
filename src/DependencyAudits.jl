@@ -458,7 +458,7 @@ function add_toplevel_module!(arg, modules::Set{Symbol})
     end
 
     !(arg isa Expr) && return
-    arg == :($(Expr(:., :Base))) && return # ignore `Base.` expressions
+    arg.head in (:.,) && arg.args[1] === :Base && return # ignore `Base.` expressions
 
     # `using Foo: bar`  →  Expr(:(:), Expr(:., :Foo), …)
     if arg.head === :(:)
