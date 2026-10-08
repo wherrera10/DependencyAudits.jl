@@ -247,8 +247,8 @@ using Test, TOML, RegistryInstances, DependencyAudits
 
     @testset "audit and report" begin
         audit = auditdependencies(pwd())
-        @warn pwd() audit
-        @test sort!(audit.declared) == [:JuliaSyntax, :RegistryInstances, :TOML]
+        @test audit.used == [:JuliaSyntax, :RegistryInstances, :TOML]
+        @test audit.stdlibs == [:TOML, :Test]
         io = IOBuffer()
         auditreport(audit; io=io)
         out = String(take!(io))
