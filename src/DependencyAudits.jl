@@ -142,7 +142,7 @@ end
 
 """
     finddependencyuses(dirpath::AbstractString = ".";
-                         exclude = ["test", "docs", "benchmark", ".git"])
+                         exclude = ["test", "docs", "benchmark", "example", ".git"])
         ::Dict{Symbol,Vector{String}}
 
 Recursively scan `dirpath` for Julia source files and return a dictionary
@@ -151,7 +151,7 @@ mapping each imported top-level module to the list of files (relative to
 """
 function finddependencyuses(
     dirpath::AbstractString=".";
-    exclude=["test", "docs", "benchmark", ".git"],
+    exclude=["test", "docs", "benchmark", "example", ".git"],
 )
     uses = Dict{Symbol,Vector{String}}()
     base = abspath(dirpath)
@@ -450,8 +450,8 @@ end
 Extract the single top-level module name from one argument of a `using` /
 `import` expression.  Relative imports (leading dots) are ignored.
 """
-function add_toplevel_module!(arg, modules::Set{Symbol})
-    if arg isa Symbol
+function add_toplevel_module!(arg, modules::Set{Symbol}; excluded = [:Base,])
+    if arg isa Symbol && arg ∉ excluded
         # plain `using Foo`
         push!(modules, arg)
         return
