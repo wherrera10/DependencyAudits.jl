@@ -175,6 +175,91 @@ using Test, TOML, RegistryInstances, DependencyAudits
         end
     end
 
+    @testset "import forms" begin
+        mktempdir() do dir
+            write(joinpath(dir, "Project.toml"), """
+                name = "ImportForms"
+                uuid = "00000000-0000-0000-0000-000000000006"
+                [deps]
+            """)
+
+            write(joinpath(dir, "imports.jl"), """
+                using Foo
+                import Bar
+
+                using A.B.C
+                import D.E.F
+
+                using G: g1, g2
+                import H: h1, h2
+
+                import I as J
+                using K: k as l
+
+                using M.N: n1, n2
+                import O.P: p1, p2
+
+                using .LocalMod
+                using .LocalMod.SubMod
+                import ..ParentMod
+                import ..ParentMod.SubMod
+                using ...GrandParentMod
+                import ...GrandParentMod.SubMod
+
+                using Q, R.S
+                import T, U.V
+            """)
+
+            deps = finddependencies(dir)
+
+            # Simple absolute imports.
+            @test :Foo ∈ deps
+            @test :Bar ∈ deps
+
+            # Absolute dotted imports: only the package/module root matters.
+            @test :A ∈ deps
+            @test :D ∈ deps
+
+            # Colon forms: record the module, not imported names.
+            @test :G ∈ deps
+            @test :H ∈ deps
+            @test :g1 ∉ deps
+            @test :g2 ∉ deps
+            @test :h1 ∉ deps
+            @test :h2 ∉ deps
+
+            # Aliases: record the imported module, not the alias.
+            @test :I ∈ deps
+            @test :J ∉ deps
+            @test :K ∈ deps
+            @test :L ∉ deps
+
+            # Dotted module paths with colon imports.
+            @test :M ∈ deps
+            @test :O ∈ deps
+            @test :N ∉ deps
+            @test :P ∉ deps
+            @test :n1 ∉ deps
+            @test :n2 ∉ deps
+            @test :p1 ∉ deps
+            @test :p2 ∉ deps
+
+            # Relative imports must not be treated as external dependencies.
+            @test :LocalMod ∉ deps
+            @test :ParentMod ∉ deps
+            @test :GrandParentMod ∉ deps
+            @test :SubMod ∉ deps
+
+            # Multiple imports in one statement.
+            @test :Q ∈ deps
+            @test :R ∈ deps
+            @test :T ∈ deps
+            @test :U ∈ deps
+            @test :S ∉ deps
+            @test :V ∉ deps
+        end
+    end
+
     @testset "include_extras / include_weakdeps" begin
         mktempdir() do dir
             open(joinpath(dir, "Project.toml"), "w") do io
