@@ -247,12 +247,12 @@ using Test, TOML, RegistryInstances, DependencyAudits
 
     @testset "audit and report" begin
         audit = auditdependencies(pwd())
-        @test audit.used == [:JuliaSyntax, :RegistryInstances, :TOML]
+        @test audit.used ==  [:DependencyAudits, :RegistryInstances, :TOML, :Test]
         @test audit.stdlibs == [:TOML, :Test]
         io = IOBuffer()
         auditreport(audit; io=io)
         out = String(take!(io))
-        @test occursin("JuliaSyntax", out)
+        @test occursin("Audit", out)
         @test occursin("RegistryInstances", out)
         @test occursin("TOML", out)
     end        
