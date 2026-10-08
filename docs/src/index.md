@@ -1,5 +1,7 @@
 # DependencyAudits.jl
 
+![Description](assets/depaud.png)
+
 Audit a code tree for its dependencies and correlate with its Project.toml file
 
 Example:
