@@ -11,20 +11,18 @@ export finddependencies, finddependencyuses, auditdependencies, auditreport, rep
 """
     stdlibnames()::Set{Symbol}
 
-Return the set of standard-library module names available in the running
+Return the set of non-jll standard-library module names available in the running
 Julia installation. Built by scanning `Sys.STDLIB`. Run once at startup to 
 cache the list of standard libraries as a const.
 """
 function stdlibnames()::Set{Symbol}
     names = Set{Symbol}()
     if isdir(Sys.STDLIB)
-
         for entry in readdir(Sys.STDLIB)
-            if isdir(joinpath(Sys.STDLIB, entry))
+            if !endswith(entry, "_jll") && isdir(joinpath(Sys.STDLIB, entry))
                 push!(names, Symbol(entry))
             end
         end
-
     end
     return names
 end
