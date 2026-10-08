@@ -291,7 +291,7 @@ function auditdependencies(
     unused = setdiff(declared, used)
     missingones = setdiff(used, union(declared, STDLIBS))
 
-    tups = packagestrings.(string.(unique!(vcat(collect(used), collect(stdlibs_used)))))
+    tups = packagestrings.(string.(unique!(vcat(collect(used), collect(declared)))))
     tomltxt = isempty(tups) || !any(!isnothing, getfield.(tups, :uuid)) ?
               "" :
     begin
@@ -502,5 +502,6 @@ function cliplast(s::AbstractString)::String
     return count(==('.'), s) < 2 ? s : replace(s, r"\.[^.]*$" => "")
 end
 cliplast(v::VersionNumber) = cliplast(string(v))
+
 
 end # module DependencyAudits
