@@ -194,8 +194,12 @@ Compare modules referenced by Julia source files with dependencies declared in
 function searches under `dirpath`.
 
 `allowmissingtoml` controls whether a missing project file is permitted.
+
 `include_extras` and `include_weakdeps` cause `[extras]` and `[weakdeps]`
 entries to be included when determining declared dependencies.
+
+`shorten_versions` controls whether a latest version number of 3 levels or more 
+is truncated in the `tomltext` of suggested possible .toml lines.
 
 The returned named tuple contains:
 
