@@ -450,16 +450,15 @@ end
 Extract the single top-level module name from one argument of a `using` /
 `import` expression.  Relative imports (leading dots) are ignored.
 """
-function add_toplevel_module!(arg, modules::Set{Symbol}; excluded = [:Base,])
-    if arg isa Symbol && arg ∉ excluded
+function add_toplevel_module!(arg, modules::Set{Symbol})
+    if arg isa Symbol
         # plain `using Foo`
         push!(modules, arg)
         return
     end
 
-    if !(arg isa Expr)
-        return
-    end
+    !(arg isa Expr) && return
+    arg == :($(Expr(:., :Base))) && return # ignore `Base.` expressions
 
     # `using Foo: bar`  →  Expr(:(:), Expr(:., :Foo), …)
     if arg.head === :(:)
