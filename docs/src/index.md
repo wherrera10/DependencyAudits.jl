@@ -18,7 +18,7 @@ Example:
     julia> cd(".julia/dev/Accessors/test")
     
     julia> auditreport(auditdependencies())
-    Project file : C:\Users\wherr\.julia\dev\Accessors\test\Project.toml
+    Project file : /homw/.julia/dev/Accessors\/test/Project.toml
     
     Declared dependencies (18):
       Aqua
