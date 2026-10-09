@@ -430,7 +430,7 @@ end
 
 Alias for `auditreport`.
 """
-const reportaudit = auditreport
+reportaudit(audit; io::IO = stdout) = auditreport(audit; io=io)
 
 """
     extract_modules_from_file!(filepath, modules::Set{Symbol})
