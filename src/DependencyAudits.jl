@@ -70,6 +70,11 @@ function registeredversions(name::AbstractString; includeremoved::Bool=false)
     return sort!(unique!(versions))
 end
 
+"""
+    registeredversions(name; kwargs...) -> Vector{VersionNumber}
+
+Alias for `registeredversions` that accepts any type convertible to a string.
+"""
 registeredversions(name; kwargs...) = registeredversions(string(name); kwargs...)
 
 """
@@ -83,6 +88,11 @@ function latestversion(name::AbstractString; includeremoved::Bool=false)
     return isempty(vs) ? nothing : last(vs)
 end
 
+"""
+    latestversion(s; kwargs...) -> Union{VersionNumber, Nothing}
+
+Alias for `latestversion` that accepts any type convertible to a string.
+"""
 latestversion(s; kwargs...) = latestversion(string(s); kwargs...)
 
 """
@@ -100,6 +110,18 @@ version without downloading the package.
 """
 function packagestrings(pkgname::AbstractString)
     return (name=pkgname, uuid=uuidof(pkgname), version=latestversion(pkgname))
+end
+
+"""
+    _stdlib_uuid(name) -> Union{String, Nothing}
+
+Get the UUID of a standard library, read from its Project.toml under `Sys.STDLIB`.
+"""
+function _stdlib_uuid(name)
+    file = joinpath(Sys.STDLIB, string(name), "Project.toml")
+    isfile(file) || return nothing
+    uuid = get(TOML.parsefile(file), "uuid", nothing)
+    return uuid isa AbstractString ? String(uuid) : nothing
 end
 
 const DEFAULT_EXCLUDE = ["test", "docs", "benchmark", "example", ".git"]
@@ -148,6 +170,15 @@ function finddependencyuses(
     return uses
 end
 
+"""
+    _finddependencyuses(dirpath::AbstractString; exclude)::Tuple{Dict{Symbol,Vector{String}}, Vector{String}}
+
+Recursively scan via `walkdir` the `dirpath` for Julia source files and return a 
+Tuple{Dict{Symbol,Vector{String}}, Vector{String}} containing:
+
+- A dictionary mapping each imported top-level module to the list of files, relative to `dirpath`, in which it appears.
+- A vector of parse errors encountered during the scan, used to guide the parsing of files in subsequent calls.
+"""
 function _finddependencyuses(
     dirpath::AbstractString;
     exclude,
@@ -194,12 +225,11 @@ Compare modules referenced by Julia source files with dependencies declared in
 function searches under `dirpath`.
 
 `allowmissingtoml` controls whether a missing project file is permitted.
-
 `include_extras` and `include_weakdeps` cause `[extras]` and `[weakdeps]`
 entries to be included when determining declared dependencies.
 
-`shorten_versions` controls whether a latest version number of 3 levels or more 
-is truncated in the `tomltext` of suggested possible .toml lines.
+`shorten_versions` indicates whether version numbers with 3 or more components in the 
+suggested TOML snippet should be shortened by dropping the final integer component.
 
 The returned named tuple contains:
 
@@ -289,28 +319,33 @@ function auditdependencies(
 
     names = unique!(vcat(collect(used), collect(declared)))
     tups = packagestrings.(string.(names))
-    registry_tups = filter(t -> !isnothing(t.uuid), tups)
+    registry_tups = filter(
+        t -> !isnothing(t.uuid) && !(Symbol(t.name) in STDLIBS),
+        tups,
+    )
+    stdlib_entries = Tuple{String,String}[]
+    for s in sort!(collect(stdlibs_used))
+        uuid = _stdlib_uuid(s)
+        isnothing(uuid) || push!(stdlib_entries, (string(s), uuid))
+    end
 
-    tomltxt = if isempty(registry_tups)
+    tomltxt = if isempty(registry_tups) && isempty(stdlib_entries)
         ""
     else
-        deps = join(
-            [t.name * " = " * "\"" * t.uuid * "\"" for t in registry_tups],
-            "\n",
-        )
+        depentries = sort!(vcat(
+            [(t.name, t.uuid) for t in registry_tups],
+            stdlib_entries,
+        ))
+        deps = join(["$n = \"$u\"" for (n, u) in depentries], "\n")
         versions = filter(t -> !isnothing(t.version), registry_tups)
-        compat = if shorten_versions
-            join(
-                [t.name * " = " * "\"" * cliplast(t.version) * "\"" for t in versions],
-                "\n",
-            )
-        else
-            join(
-                [t.name * " = " * "\"" * string(t.version) * "\"" for t in versions],
-                "\n",
-            )
-        end
-        "[deps]\n" * deps * "\n\n[compat]\njulia = \"1.10\"\n" * compat * "\n"
+        complines = String[
+            t.name * " = \"" *
+            (shorten_versions ? cliplast(t.version) : string(t.version)) * "\""
+            for t in versions
+        ]
+        append!(complines, ["$n = \"1\"" for (n, _) in stdlib_entries])
+        compat = isempty(complines) ? "" : join(complines, "\n") * "\n"
+        "[deps]\n" * deps * "\n\n[compat]\njulia = \"1.10\"\n" * compat
     end
 
     return (
@@ -506,5 +541,6 @@ function cliplast(s::AbstractString)::String
 end
 
 cliplast(v::VersionNumber) = cliplast(string(v))
+
 
 end # module DependencyAudits
