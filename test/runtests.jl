@@ -316,12 +316,13 @@ using Test, TOML, RegistryInstances, DependencyAudits
         end
     end
 
-    @testset "version functions" begin
-        @test versionof(RegistryInstances) == v"0.1.0"
-        @test length(registeredversions("Accessors")) > 40
-        @test v"0.1.40" < versionof("Accessors") < v"0.3"
-        @test registeredversions("RegistryInstances") !== nothing
-    end
+    # These tests may break with outside package updates and so are commented out
+    #@testset "version functions" begin
+    #    @test versionof(RegistryInstances) == v"0.1.0"
+    #    @test length(registeredversions("Accessors")) > 40
+    #    @test v"0.1.40" < versionof("Accessors") < v"0.3"
+    #    @test registeredversions("RegistryInstances") !== nothing
+    #end
 
     @testset "packagestrings function" begin
         ps = packagestrings("RegistryInstances")
