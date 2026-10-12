@@ -29,9 +29,11 @@ end
 const STDLIBS = stdlibnames()
 const REGISTRY = Ref{Any}(nothing)
 const PACKAGE_ENTRIES = Dict{String,String}()
+const PACKAGE_VERSIONS = Dict{String, Vector{VersionNumber}}()
+const PACKAGE_YANKED_VERSIONS = Dict{String, Vector{VersionNumber}}()
 
 """
-    set_registry(entrynumber = 1)
+    set_registry(entrynumber = 1, includeremovedversions = false)
 
 Initializes the registry with the specified entry number. If the registry is already loaded, this will reset it to the specified entry.
 Generally the first reachable registry is used as the default,
@@ -40,10 +42,14 @@ since in most cases this is the first and only one available.
 In cases where a different registry than the first found (`1`) is wanted, the parameter
 ``entrynumber`` should be used to specify which reachable registry to set as the 
 default before other operations are performed.
+Set `includeremovedversions` to `true` to include yanked versions in the cached
+package version lists.
 """
-function set_registry(entrynumber::Integer = 1)
+function set_registry(entrynumber::Integer = 1, includeremovedversions::Bool = false)
     REGISTRY[] = nothing
     empty!(PACKAGE_ENTRIES)
+    empty!(PACKAGE_VERSIONS)
+    empty!(PACKAGE_YANKED_VERSIONS)
     registries = reachable_registries()
     len = length(registries)
     if len == 0
@@ -57,6 +63,18 @@ function set_registry(entrynumber::Integer = 1)
     REGISTRY[] = registries[entrynumber]
     for (_, entry) in REGISTRY[]
         PACKAGE_ENTRIES[entry.name] = string(entry.uuid)
+        info = registry_info(entry)
+        PACKAGE_VERSIONS[entry.name] = VersionNumber[]
+        PACKAGE_YANKED_VERSIONS[entry.name] = VersionNumber[]
+        for (v, vinfo) in info.version_info
+            vinfo.yanked && push!(PACKAGE_YANKED_VERSIONS[entry.name], v)
+            if includeremovedversions || !vinfo.yanked
+                push!(PACKAGE_VERSIONS[entry.name], v)
+            end
+        end
+    end
+    for name in stdlibnames()
+        PACKAGE_VERSIONS[string(name)] = [v"1"] # stdlib version default
     end
     return REGISTRY[]
 end
@@ -76,21 +94,20 @@ end
 uuidof(s) = uuidof(string(s))
 
 """
-    registeredversions(name; includeremoved=false) -> Vector{VersionNumber}
+    registeredversions(name; includeremovedversions=false) -> Vector{VersionNumber}
 
 Return all versions of package `name` found in the reachable registry.
 Initializes the registry if it has not been loaded yet.
 """
-function registeredversions(name::AbstractString; includeremoved::Bool=false)
+function registeredversions(name::AbstractString; includeremovedversions::Bool=false)
     isnothing(REGISTRY[]) && set_registry()
-    versions = VersionNumber[]
-    isnothing(REGISTRY[]) && return versions
-    for (_, entry) in REGISTRY[]
-        entry.name == name || continue
-        info = registry_info(entry)
-        for (v, vinfo) in info.version_info
-            (includeremoved || !vinfo.yanked) && push!(versions, v)
-        end
+    isnothing(REGISTRY[]) && return VersionNumber[]
+    versions = copy(get(PACKAGE_VERSIONS, name, VersionNumber[]))
+    yankedversions = get(PACKAGE_YANKED_VERSIONS, name, VersionNumber[])
+    if includeremovedversions
+        append!(versions, yankedversions)
+    else
+        filter!(version -> !(version in yankedversions), versions)
     end
     return sort!(unique!(versions))
 end
@@ -103,13 +120,13 @@ Alias for `registeredversions` that accepts any type convertible to a string.
 registeredversions(name; kwargs...) = registeredversions(string(name); kwargs...)
 
 """
-    latestversion(name; includeremoved=false) -> Union{VersionNumber, Nothing}
+    latestversion(name; includeremovedversions=false) -> Union{VersionNumber, Nothing}
 
 Return the latest registered version of package `name`, or `nothing` if no
 version is available.
 """
-function latestversion(name::AbstractString; includeremoved::Bool=false)
-    vs = registeredversions(name; includeremoved=includeremoved)
+function latestversion(name::AbstractString; includeremovedversions::Bool=false)
+    vs = registeredversions(name; includeremovedversions=includeremovedversions)
     return isempty(vs) ? nothing : last(vs)
 end
 
