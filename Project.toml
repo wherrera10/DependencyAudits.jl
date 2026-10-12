@@ -1,7 +1,7 @@
 name = "DependencyAudits"
 uuid = "4f8e0e77-6f95-4fcb-9548-1e391cbc7c20"
 authors = ["William Herrera <wherrera@alahonua.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 JuliaSyntax = "70703baa-626e-46a2-a12c-08ffd08c73b4"
