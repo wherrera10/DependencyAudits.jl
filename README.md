@@ -7,7 +7,7 @@
 Audit source code dependencies for the correctness of the files listed in Project.toml.
 Useful to assist in creating a Project.toml for an existing code tree. 
 `auditreport(auditdependencies())` will suggest lines to be placed in Project.toml 
-and report packages used but not included in your .toml file. Bt default this 
+and report packages used but not included in your .toml file. By default this 
 audit will proceed even if a .toml file has not yet been created, which can
 be useful when starting from Julia code being made into a distributable package.
 
