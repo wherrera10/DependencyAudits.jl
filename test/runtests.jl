@@ -316,6 +316,11 @@ using Test, TOML, RegistryInstances, DependencyAudits
         end
     end
 
+    @testset "missing package version lookup" begin
+        @test isempty(registeredversions("NonExistentPackage"))
+        @test latestversion("NonExistentPackage") === nothing
+    end
+
     # These tests may break with outside package updates and so are commented out
     #@testset "version functions" begin
     #    @test versionof(RegistryInstances) == v"0.1.0"
