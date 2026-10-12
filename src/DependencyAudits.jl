@@ -40,7 +40,7 @@ Generally the first reachable registry is used as the default,
 since in most cases this is the first and only one available.
 
 In cases where a different registry than the first found (`1`) is wanted, the parameter
-``entrynumber`` should be used to specify which reachable registry to set as the 
+``entrynumber`` should be used to specify which reachable registry to set as the
 default before other operations are performed.
 Set `includeremovedversions` to `true` to include yanked versions in the cached
 package version lists.
@@ -266,7 +266,7 @@ Compare modules referenced by Julia source files with dependencies declared in
 `projectpath` specifies an explicit project file. If it is `nothing`, the
 function searches under `dirpath`.
 
-`allowmissingtoml` controls whether a missing project file is permitted.
+`allowmissingtoml` controls whether a missing or invalid project file is permitted.
 `include_extras` and `include_weakdeps` cause `[extras]` and `[weakdeps]`
 entries to be included when determining declared dependencies.
 
@@ -275,16 +275,16 @@ suggested TOML snippet should be shortened by dropping the final integer compone
 
 The returned named tuple contains:
 
-- `projectpath`  – absolute project-file path, or `nothing`
-- `projectmissing` – whether no project file was found
-- `declared`     – declared dependency names
-- `used`         – modules found in source
-- `unused`       – declared but never referenced
-- `undeclared`   – referenced modules that are neither declared nor stdlibs
-- `stdlibs`      – referenced standard-library modules
-- `uses`         – module → files mapping
-- `parse_errors` – files that could not be parsed
-- `tomltext`     – suggested TOML dependency/compatibility snippet
+- `projectpath`  - absolute project-file path, or `nothing`
+- `projectmissing` - whether no project file was found
+- `declared`     - declared dependency names
+- `used`         - modules found in source
+- `unused`       - declared but never referenced
+- `undeclared`   - referenced modules that are neither declared nor stdlibs
+- `stdlibs`      - referenced standard-library modules
+- `uses`         - module → files mapping
+- `parse_errors` - files that could not be parsed
+- `tomltext`     - suggested TOML dependency/compatibility snippet
 
 The function reads, but does not modify, the project file.
 """
@@ -328,7 +328,12 @@ function auditdependencies(
         projectdata = try
             TOML.parsefile(project)
         catch err
-            throw(ArgumentError("Could not parse $project: $err"))
+            projectmissing = true
+            if !allowmissingtoml
+                throw(ArgumentError("Project file is missing or invalid: $project ($err)"))
+            end
+            project = nothing
+            Dict{String,Any}("deps" => Dict{String,Any}())
         end
     end
 
