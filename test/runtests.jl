@@ -114,6 +114,18 @@ using Test, TOML, RegistryInstances, DependencyAudits
         end
     end
 
+    @testset "invalid project TOML treated as missing" begin
+        mktempdir() do dir
+            write(joinpath(dir, "Project.toml"), "this is not valid TOML")
+
+            audit = auditdependencies(dir)
+            @test audit.projectmissing
+            @test isnothing(audit.projectpath)
+            @test isempty(audit.declared)
+            @test_throws ArgumentError auditdependencies(dir; allowmissingtoml=false)
+        end
+    end
+
     @testset "syntax errors are non-fatal" begin
         mktempdir() do dir
             write(joinpath(dir, "Project.toml"), """
