@@ -5,7 +5,7 @@ module DependencyAudits
 using JuliaSyntax, TOML
 using RegistryInstances
 
-export uuidof, registeredversions, latestversion, versionof, packagestrings
+export set_registry, uuidof, registeredversions, latestversion, versionof, packagestrings
 export finddependencies, finddependencyuses, auditdependencies, auditreport, reportaudit
 
 """
@@ -27,19 +27,38 @@ function stdlibnames()::Set{Symbol}
 end
 
 const STDLIBS = stdlibnames()
-
-const REGISTRY = try
-    first(reachable_registries())
-catch
-    nothing
-end
-
+const REGISTRY = Ref{Any}(nothing)
 const PACKAGE_ENTRIES = Dict{String,String}()
 
-if !isnothing(REGISTRY)
-    for (_, entry) in REGISTRY
+"""
+    set_registry(entrynumber = 1)
+
+Initializes the registry with the specified entry number. If the registry is already loaded, this will reset it to the specified entry.
+Generally the first reachable registry is used as the default,
+since in most cases this is the first and only one available.
+
+In cases where a different registry than the first found (`1`) is wanted, the parameter
+``entrynumber`` should be used to specify which reachable registry to set as the 
+default before other operations are performed.
+"""
+function set_registry(entrynumber::Integer = 1)
+    REGISTRY[] = nothing
+    empty!(PACKAGE_ENTRIES)
+    registries = reachable_registries()
+    len = length(registries)
+    if len == 0
+        @warn "No reachable registries found."
+        return nothing
+    end
+    if !(1 <= entrynumber <= len)
+        @warn "Requested registry entry number $entrynumber is outside the available range 1:$len."
+        return nothing
+    end
+    REGISTRY[] = registries[entrynumber]
+    for (_, entry) in REGISTRY[]
         PACKAGE_ENTRIES[entry.name] = string(entry.uuid)
     end
+    return REGISTRY[]
 end
 
 """
@@ -47,20 +66,26 @@ end
     uuidof(s)
 
 Return the UUID of the package with the given name `s` as a string.
+Initializes the registry to default if it has not been loaded yet.
 Returns `nothing` if the registry is unavailable or the package is not found.
 """
-uuidof(s::AbstractString) = get(PACKAGE_ENTRIES, s, nothing)
+function uuidof(s::AbstractString)
+    isnothing(REGISTRY[]) && set_registry(1)
+    return get(PACKAGE_ENTRIES, s, nothing)
+end
 uuidof(s) = uuidof(string(s))
 
 """
     registeredversions(name; includeremoved=false) -> Vector{VersionNumber}
 
 Return all versions of package `name` found in the reachable registry.
+Initializes the registry if it has not been loaded yet.
 """
 function registeredversions(name::AbstractString; includeremoved::Bool=false)
+    isnothing(REGISTRY[]) && set_registry()
     versions = VersionNumber[]
-    isnothing(REGISTRY) && return versions
-    for (_, entry) in REGISTRY
+    isnothing(REGISTRY[]) && return versions
+    for (_, entry) in REGISTRY[]
         entry.name == name || continue
         info = registry_info(entry)
         for (v, vinfo) in info.version_info
